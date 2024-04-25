@@ -264,6 +264,28 @@ class FunctionScore(Query):
         super(FunctionScore, self).__init__(**kwargs)
 
 
+class Neural(Query):
+    name = "neural"
+
+    def __init__(self, **kwargs):
+        super(Neural, self).__init__()
+
+        embedding_field = kwargs.pop("embedding_field")
+        if not embedding_field:
+            raise ValueError("Missing embedding_field argument")
+
+        # Validate that all necessary keys are present
+        required_keys = {'query_text', 'model_id', 'k'}
+        if not required_keys <= kwargs.keys():
+            missing_keys = required_keys - kwargs.keys()
+            raise ValueError(f"Missing required fields: {missing_keys}")
+
+        # Nest all required keys under the specified embedding field
+        self._params[embedding_field] = {key: kwargs[key] for key in required_keys}
+
+
+
+
 # compound queries
 class Boosting(Query):
     name = "boosting"
