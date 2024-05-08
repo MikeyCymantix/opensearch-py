@@ -65,7 +65,6 @@ def test_bool_to_dict() -> None:
 
     assert {"bool": {"must": [{"match": {"f": "value"}}]}} == bool.to_dict()
 
-
 def test_dismax_to_dict() -> None:
     assert {"dis_max": {"queries": [{"term": {"_type": "article"}}]}} == query.DisMax(
         queries=[query.Term(_type="article")]
@@ -564,3 +563,4 @@ def test_script_score() -> None:
     assert isinstance(q.query, query.MatchAll)
     assert q.script == {"source": "...", "params": {}}
     assert q.to_dict() == d
+
