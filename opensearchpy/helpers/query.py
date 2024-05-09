@@ -28,6 +28,8 @@ import collections.abc as collections_abc
 from itertools import chain
 from typing import Any, Optional
 
+from opensearchpy.helpers.neural import NeuralSearch
+
 # 'SF' looks unused but the test suite assumes it's available
 # from this module so others are liable to do so as well.
 from ..helpers.function import SF, ScoreFunction
@@ -264,10 +266,37 @@ class FunctionScore(Query):
         super(FunctionScore, self).__init__(**kwargs)
 
 
+class Neural(Query):
+    name = "neural"
+    _param_defs = {"neural": {"type": "neural_query"}}
+
+    def __init__(self, **kwargs):
+        super(Neural, self).__init__()
+
+        if "neural" in kwargs:
+            pass
+        elif "embedding_field" in kwargs:
+            embedding_field = kwargs.pop("embedding_field")
+            self._params[embedding_field] = {
+                key: kwargs[key] for key in NeuralSearch._classes
+            }
+        else:
+            keys = kwargs["neural"] = {}
+            for name in NeuralSearch._classes:  # ingnore
+                if name in kwargs:
+                    keys[name] = kwargs.pop(name)
+            super(Neural, self).__init__(**kwargs)
+
+
 # compound queries
 class Boosting(Query):
     name = "boosting"
     _param_defs = {"positive": {"type": "query"}, "negative": {"type": "query"}}
+
+
+class Hybrid(Query):
+    name = "hybrid"
+    _param_defs = {"query": {"type": "query", "mutli": True}}
 
 
 class ConstantScore(Query):
