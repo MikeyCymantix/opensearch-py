@@ -28,6 +28,8 @@ import collections.abc as collections_abc
 from itertools import chain
 from typing import Any, Optional
 
+from opensearchpy.helpers.neural import NeuralSearch
+
 # 'SF' looks unused but the test suite assumes it's available
 # from this module so others are liable to do so as well.
 from ..helpers.function import SF, ScoreFunction
@@ -266,36 +268,24 @@ class FunctionScore(Query):
 
 class Neural(Query):
     name = "neural"
-    _param_defs = {
-        "query_text" : {"type": "query"},
-        "model_id" : {"type": "query"},
-        "k" : {"type": "query"},
-    }
+    _param_defs = {"neural": {"type": "neural_query"}}
 
     def __init__(self, **kwargs):
         super(Neural, self).__init__()
 
-        embedding_field = kwargs.pop("embedding_field", None)
-        if embedding_field is None:
-            # %% TODO: Double, triple check this %%
-            # if we are missing embedding field but have passage_embedding
-            # this means that we're coming form a proxied query. we know that if the
-            # query is valid, then the dictionary should already have the params nested
-            # correctly and is of the correct form
-            passage_embedding = kwargs.get("passage_embedding", None)
-            self._params["passage_embedding"] = passage_embedding
-            return
+        if "neural" in kwargs:
+            pass
+        elif "embedding_field" in kwargs:
+            embedding_field = kwargs.pop("embedding_field")
+            self._params[embedding_field] = {
+                key: kwargs[key] for key in NeuralSearch._classes
+            }
         else:
-            if not embedding_field:
-                raise ValueError("Missing embedding_field argument")
-            # Validate that all necessary keys are present
-            required_keys = {"query_text", "model_id", "k"}
-            if not required_keys <= kwargs.keys():
-                missing_keys = required_keys - kwargs.keys()
-                raise ValueError(f"Missing required fields: {missing_keys}")
-
-        # Nest all required keys under the specified embedding field
-        self._params[embedding_field] = {key: kwargs[key] for key in required_keys}
+            keys = kwargs["neural"] = {}
+            for name in NeuralSearch._classes:  # ingnore
+                if name in kwargs:
+                    keys[name] = kwargs.pop(name)
+            super(Neural, self).__init__(**kwargs)
 
 
 # compound queries
@@ -306,7 +296,7 @@ class Boosting(Query):
 
 class Hybrid(Query):
     name = "hybrid"
-    _param_deffs = {"query": {"type": "query", "mutli": True}}
+    _param_defs = {"query": {"type": "query", "mutli": True}}
 
 
 class ConstantScore(Query):

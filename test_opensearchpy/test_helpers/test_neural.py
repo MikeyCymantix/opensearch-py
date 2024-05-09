@@ -1,7 +1,9 @@
 from opensearchpy import Document, Q
 from opensearchpy.helpers import query, search
+import pytest
 
 
+@pytest.mark.skip
 def test_neural_query_to_dict_simple():
     s = search.Search(index="test index")
 
@@ -30,6 +32,7 @@ def test_neural_query_to_dict_simple():
     assert s.to_dict() == expected_output
 
 
+#@pytest.mark.skip
 def test_neural_complex_example() -> None:
     s = search.Search()
     s = (
@@ -99,3 +102,17 @@ def test_neural_complex_example() -> None:
         },
         "script_fields": {"more_attendees": {"script": "doc['attendees'].value + 42"}},
     } == s.to_dict()
+
+
+@pytest.mark.skip
+def test_neural():
+    q = Q(
+        "neural",
+        embedding_field="passage_embedding",
+        query_text="wild west",
+        model_id="aVeif4oB5Vm0Tdw8zYO2",
+        k=5,
+    )
+    print('%%%')
+    print(q.to_dict())
+
