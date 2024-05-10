@@ -24,6 +24,7 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
+from collections import abc as collections_abc
 import collections.abc as collections_abc
 from itertools import chain
 from typing import Any, Optional
@@ -269,8 +270,6 @@ class FunctionScore(Query):
         super(FunctionScore, self).__init__(**kwargs)
 
 
-from collections import abc as collections_abc
-
 class Neural(Query):
     name = "neural"
     _param_defs = {"neural": {"type": "neural_query"}}
@@ -279,6 +278,19 @@ class Neural(Query):
         super(Neural, self).__init__()
 
         # Flatten embedding_field params if coming from Q() with only two kwargs
+        # making this assumption because the structure of a neural query
+        # when its being serialized from a dict is
+        #  q =  "neural" : {
+        #   "<embedding field>" : {
+        #       "model_id": "<model_id>",
+        #       "query_text": "<query_text",
+        #       ...
+        #  }
+        # }
+        # to avoid mutating internal state, during serialization we just
+        # transform this into
+        # {"embedding field": <embedding_field>", "model_id":"<model_id>" ...},
+        # and then it can use the default behavior
         if not kwargs.get("__expand_to_dot", False) and len(kwargs) == 2:
             embedding_field_params = {}
             try:
@@ -296,6 +308,8 @@ class Neural(Query):
         if "neural" in kwargs:
             self._params = kwargs
         elif "embedding_field" in kwargs:
+            if "query_text" not in kwargs:
+                raise KeyError(f"Missing query_text key")
             self._params = {
                 key: kwargs[key] for key in NeuralSearch._classes if key in kwargs
             }
@@ -319,7 +333,11 @@ class Neural(Query):
         """
         if "embedding_field" not in self._params:
             raise ValueError("Missing 'embedding_field' in the parameters.")
-        d = {pname: value for pname, value in self._params.items() if pname != "embedding_field"}
+        d = {
+            pname: value
+            for pname, value in self._params.items()
+            if pname != "embedding_field"
+        }
         return {self.name: {self._params["embedding_field"]: d}}
 
 

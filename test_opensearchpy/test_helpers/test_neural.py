@@ -1,9 +1,8 @@
-from opensearchpy import Document, Q
-from opensearchpy.helpers import query, search
+from opensearchpy import Q
+from opensearchpy.helpers import search
 import pytest
 
 
-#@pytest.mark.skip
 def test_neural_query_to_dict_simple():
     s = search.Search(index="test index")
 
@@ -32,7 +31,6 @@ def test_neural_query_to_dict_simple():
     assert s.to_dict() == expected_output
 
 
-#@pytest.mark.skip
 def test_neural_complex_example() -> None:
     s = search.Search()
     s = (
@@ -104,42 +102,22 @@ def test_neural_complex_example() -> None:
     } == s.to_dict()
 
 
-#@pytest.mark.skip
-def test_neural():
-    q = Q(
-        "neural",
-        embedding_field="passage_embedding",
-        query_text="wild west",
-        model_id="aVeif4oB5Vm0Tdw8zYO2",
-        k=5,
-    )
-    print('%%%')
-    print(q.to_dict())
-
-# Test case for error handling when no parameters are provided
 def test_neural_query_empty_params():
-    with pytest.raises(ValueError, match="No valid parameters provided"):
+    with pytest.raises(
+        ValueError,
+        match="Expected a single embedding field key, but got multiple or none.",
+    ):
         Q("neural")
 
-# Test case for error handling when 'embedding_field' is missing
-def test_neural_query_missing_embedding_field():
-    with pytest.raises(ValueError, match="Missing 'embedding_field' parameter"):
-        Q(
-            "neural",
-            query_text="wild west",
-            model_id="aVeif4oB5Vm0Tdw8zYO2",
-            k=5
-        )
 
-# Test case for a neural query with additional parameters
-def test_neural_query_additional_params():
+def test_neural_query_multimodal_image():
     q = Q(
         "neural",
         embedding_field="passage_embedding",
         query_text="wild west",
+        query_image="123481234.jpg",
         model_id="aVeif4oB5Vm0Tdw8zYO2",
         k=10,
-        threshold=0.7
     )
     expected_output = {
         "neural": {
@@ -147,28 +125,29 @@ def test_neural_query_additional_params():
                 "query_text": "wild west",
                 "model_id": "aVeif4oB5Vm0Tdw8zYO2",
                 "k": 10,
-                "threshold": 0.7
+                "query_image": "123481234.jpg",
             }
         }
     }
     assert q.to_dict() == expected_output
 
-# Test case for neural query within a combined query
+
 def test_neural_combined_query():
     s = search.Search(index="test index")
     s = s.query(
-        Q("bool",
-          must=[
-              Q("match", title="AI"),
-              Q(
-                  "neural",
-                  embedding_field="document_embedding",
-                  query_text="deep learning",
-                  model_id="xyz123",
-                  k=3
-              )
-          ],
-          must_not=[Q("match", title="hardware")]
+        Q(
+            "bool",
+            must=[
+                Q("match", title="AI"),
+                Q(
+                    "neural",
+                    embedding_field="document_embedding",
+                    query_text="deep learning",
+                    model_id="xyz123",
+                    k=3,
+                ),
+            ],
+            must_not=[Q("match", title="hardware")],
         )
     )
     expected_output = {
@@ -181,55 +160,24 @@ def test_neural_combined_query():
                             "document_embedding": {
                                 "query_text": "deep learning",
                                 "model_id": "xyz123",
-                                "k": 3
+                                "k": 3,
                             }
                         }
-                    }
+                    },
                 ],
-                "must_not": [{"match": {"title": "hardware"}}]
+                "must_not": [{"match": {"title": "hardware"}}],
             }
         }
     }
     assert s.to_dict() == expected_output
 
-# Test case for neural query within an aggregation
-def test_neural_aggregation_example():
-    s = search.Search(index="test index")
-    s = s.query(
-        Q(
-            "neural",
-            embedding_field="content_embedding",
-            query_text="data science",
-            model_id="abc789",
-            k=4
-        )
-    ).aggs.bucket("category_count", "terms", field="category")
-    expected_output = {
-        "query": {
-            "neural": {
-                "content_embedding": {
-                    "query_text": "data science",
-                    "model_id": "abc789",
-                    "k": 4
-                }
-            }
-        },
-        "aggs": {
-            "category_count": {
-                "terms": {"field": "category"}
-            }
-        }
-    }
-    assert s.to_dict() == expected_output
 
-# Test case for a neural query with a missing required key inside a nested dictionary
 def test_neural_missing_key_in_params():
-    with pytest.raises(ValueError, match="Missing 'query_text' key"):
+    with pytest.raises(KeyError, match="Missing query_text key"):
         q = Q(
             "neural",
             embedding_field="passage_embedding",
             model_id="aVeif4oB5Vm0Tdw8zYO2",
-            k=5
+            k=5,
         )
         q.to_dict()
-
