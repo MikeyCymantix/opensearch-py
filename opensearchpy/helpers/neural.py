@@ -56,7 +56,6 @@ class NeuralSearch(DslBase):
     _param_defs = {}
 
 
-
 class EmbeddingField(NeuralSearch):
     name = "embedding_field"
 
@@ -69,7 +68,7 @@ class QueryText(NeuralSearch):
     name = "query_text"
 
 
-#class QueryImage(NeuralSearch):
+# class QueryImage(NeuralSearch):
 #    name = "query_image"
 
 

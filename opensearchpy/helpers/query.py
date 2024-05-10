@@ -41,7 +41,7 @@ from .utils import DslBase
 def Q(  # pylint: disable=invalid-name
     name_or_query: Any = "match_all", **params: Any
 ) -> Any:
-    #{'neural': {'passage_embedding': {'model_id': 'aVeif4oB5Vm0Tdw8zYO2', 'query_text': 'wild west', 'k': 5}}} {}
+    # {'neural': {'passage_embedding': {'model_id': 'aVeif4oB5Vm0Tdw8zYO2', 'query_text': 'wild west', 'k': 5}}} {}
     # {"match": {"title": "python"}}
     if isinstance(name_or_query, collections_abc.Mapping):
         if params:
@@ -278,7 +278,7 @@ class Neural(Query):
         # if expand to dot is present then it's coming from
         # and len == 2 then it might be coming from Q() so we flatten the
         # embedding_field params
-        if not kwargs.get('__expand_to_dot', False) and len(kwargs) == 2:
+        if not kwargs.get("__expand_to_dot", False) and len(kwargs) == 2:
 
             params = {}
             for key in kwargs.keys():
@@ -287,12 +287,8 @@ class Neural(Query):
                     for name in NeuralSearch._classes:
                         if name in embedding_field:
                             params[name] = embedding_field.pop(name)
-                    params['embedding_field'] = key
+                    params["embedding_field"] = key
                     kwargs = params
-
-
-
-
 
         if "neural" in kwargs:
             pass
@@ -312,11 +308,10 @@ class Neural(Query):
         Serialize the DSL object to plain dict
         """
         d = {}
-        embedding_field = self._params.pop('embedding_field')
+        embedding_field = self._params.pop("embedding_field")
         for pname, value in iteritems(self._params):
             d[pname] = value
-        return {self.name: {embedding_field:d}}
-
+        return {self.name: {embedding_field: d}}
 
 
 # compound queries
