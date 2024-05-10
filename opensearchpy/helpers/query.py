@@ -24,9 +24,12 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
+from collections import abc as collections_abc
 import collections.abc as collections_abc
 from itertools import chain
 from typing import Any, Optional
+
+from six import iteritems
 
 from opensearchpy.helpers.neural import NeuralSearch
 
@@ -39,6 +42,7 @@ from .utils import DslBase
 def Q(  # pylint: disable=invalid-name
     name_or_query: Any = "match_all", **params: Any
 ) -> Any:
+    # {'neural': {'passage_embedding': {'model_id': 'aVeif4oB5Vm0Tdw8zYO2', 'query_text': 'wild west', 'k': 5}}} {}
     # {"match": {"title": "python"}}
     if isinstance(name_or_query, collections_abc.Mapping):
         if params:
@@ -273,19 +277,68 @@ class Neural(Query):
     def __init__(self, **kwargs):
         super(Neural, self).__init__()
 
+        # Flatten embedding_field params if coming from Q() with only two kwargs
+        # making this assumption because the structure of a neural query
+        # when its being serialized from a dict is
+        #  q =  "neural" : {
+        #   "<embedding field>" : {
+        #       "model_id": "<model_id>",
+        #       "query_text": "<query_text",
+        #       ...
+        #  }
+        # }
+        # to avoid mutating internal state, during serialization we just
+        # transform this into
+        # {"embedding field": <embedding_field>", "model_id":"<model_id>" ...},
+        # and then it can use the default behavior
+        if not kwargs.get("__expand_to_dot", False) and len(kwargs) == 2:
+            embedding_field_params = {}
+            try:
+                for key, value in kwargs.items():
+                    if isinstance(value, collections_abc.Mapping):
+                        embedding_field = value
+                        for name in NeuralSearch._classes:
+                            if name in embedding_field:
+                                embedding_field_params[name] = embedding_field.pop(name)
+                        embedding_field_params["embedding_field"] = key
+                kwargs = embedding_field_params
+            except KeyError as e:
+                raise ValueError(f"Missing key during embedding field flattening: {e}")
+
         if "neural" in kwargs:
-            pass
+            self._params = kwargs
         elif "embedding_field" in kwargs:
-            embedding_field = kwargs.pop("embedding_field")
-            self._params[embedding_field] = {
-                key: kwargs[key] for key in NeuralSearch._classes
+            if "query_text" not in kwargs:
+                raise KeyError(f"Missing query_text key")
+            self._params = {
+                key: kwargs[key] for key in NeuralSearch._classes if key in kwargs
             }
         else:
-            keys = kwargs["neural"] = {}
-            for name in NeuralSearch._classes:  # ingnore
+            neural_params = {}
+            for name in NeuralSearch._classes:
                 if name in kwargs:
-                    keys[name] = kwargs.pop(name)
+                    neural_params[name] = kwargs.pop(name)
+            kwargs["neural"] = neural_params
             super(Neural, self).__init__(**kwargs)
+
+        # Validate required parameters
+        if not self._params:
+            raise ValueError("No valid parameters provided.")
+        if "embedding_field" not in self._params:
+            raise ValueError("Missing 'embedding_field' parameter.")
+
+    def to_dict(self) -> dict:
+        """
+        Serialize the DSL object to a plain dictionary
+        """
+        if "embedding_field" not in self._params:
+            raise ValueError("Missing 'embedding_field' in the parameters.")
+        d = {
+            pname: value
+            for pname, value in self._params.items()
+            if pname != "embedding_field"
+        }
+        return {self.name: {self._params["embedding_field"]: d}}
 
 
 # compound queries

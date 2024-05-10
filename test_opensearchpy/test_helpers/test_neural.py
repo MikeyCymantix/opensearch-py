@@ -1,9 +1,8 @@
-from opensearchpy import Document, Q
-from opensearchpy.helpers import query, search
+from opensearchpy import Q
+from opensearchpy.helpers import search
 import pytest
 
 
-@pytest.mark.skip
 def test_neural_query_to_dict_simple():
     s = search.Search(index="test index")
 
@@ -32,7 +31,6 @@ def test_neural_query_to_dict_simple():
     assert s.to_dict() == expected_output
 
 
-#@pytest.mark.skip
 def test_neural_complex_example() -> None:
     s = search.Search()
     s = (
@@ -104,15 +102,82 @@ def test_neural_complex_example() -> None:
     } == s.to_dict()
 
 
-@pytest.mark.skip
-def test_neural():
+def test_neural_query_empty_params():
+    with pytest.raises(
+        ValueError,
+        match="Expected a single embedding field key, but got multiple or none.",
+    ):
+        Q("neural")
+
+
+def test_neural_query_multimodal_image():
     q = Q(
         "neural",
         embedding_field="passage_embedding",
         query_text="wild west",
+        query_image="123481234.jpg",
         model_id="aVeif4oB5Vm0Tdw8zYO2",
-        k=5,
+        k=10,
     )
-    print('%%%')
-    print(q.to_dict())
+    expected_output = {
+        "neural": {
+            "passage_embedding": {
+                "query_text": "wild west",
+                "model_id": "aVeif4oB5Vm0Tdw8zYO2",
+                "k": 10,
+                "query_image": "123481234.jpg",
+            }
+        }
+    }
+    assert q.to_dict() == expected_output
 
+
+def test_neural_combined_query():
+    s = search.Search(index="test index")
+    s = s.query(
+        Q(
+            "bool",
+            must=[
+                Q("match", title="AI"),
+                Q(
+                    "neural",
+                    embedding_field="document_embedding",
+                    query_text="deep learning",
+                    model_id="xyz123",
+                    k=3,
+                ),
+            ],
+            must_not=[Q("match", title="hardware")],
+        )
+    )
+    expected_output = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {"title": "AI"}},
+                    {
+                        "neural": {
+                            "document_embedding": {
+                                "query_text": "deep learning",
+                                "model_id": "xyz123",
+                                "k": 3,
+                            }
+                        }
+                    },
+                ],
+                "must_not": [{"match": {"title": "hardware"}}],
+            }
+        }
+    }
+    assert s.to_dict() == expected_output
+
+
+def test_neural_missing_key_in_params():
+    with pytest.raises(KeyError, match="Missing query_text key"):
+        q = Q(
+            "neural",
+            embedding_field="passage_embedding",
+            model_id="aVeif4oB5Vm0Tdw8zYO2",
+            k=5,
+        )
+        q.to_dict()
