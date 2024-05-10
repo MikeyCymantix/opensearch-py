@@ -3,7 +3,7 @@ from opensearchpy.helpers import query, search
 import pytest
 
 
-@pytest.mark.skip
+#@pytest.mark.skip
 def test_neural_query_to_dict_simple():
     s = search.Search(index="test index")
 
@@ -104,7 +104,7 @@ def test_neural_complex_example() -> None:
     } == s.to_dict()
 
 
-@pytest.mark.skip
+#@pytest.mark.skip
 def test_neural():
     q = Q(
         "neural",

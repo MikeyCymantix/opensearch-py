@@ -28,6 +28,8 @@ import collections.abc as collections_abc
 from itertools import chain
 from typing import Any, Optional
 
+from six import iteritems
+
 from opensearchpy.helpers.neural import NeuralSearch
 
 # 'SF' looks unused but the test suite assumes it's available
@@ -39,6 +41,7 @@ from .utils import DslBase
 def Q(  # pylint: disable=invalid-name
     name_or_query: Any = "match_all", **params: Any
 ) -> Any:
+    #{'neural': {'passage_embedding': {'model_id': 'aVeif4oB5Vm0Tdw8zYO2', 'query_text': 'wild west', 'k': 5}}} {}
     # {"match": {"title": "python"}}
     if isinstance(name_or_query, collections_abc.Mapping):
         if params:
@@ -272,13 +275,30 @@ class Neural(Query):
 
     def __init__(self, **kwargs):
         super(Neural, self).__init__()
+        # if expand to dot is present then it's coming from
+        # and len == 2 then it might be coming from Q() so we flatten the
+        # embedding_field params
+        if not kwargs.get('__expand_to_dot', False) and len(kwargs) == 2:
+
+            params = {}
+            for key in kwargs.keys():
+                if isinstance(kwargs[key], collections_abc.Mapping):
+                    embedding_field = kwargs.get(key)
+                    for name in NeuralSearch._classes:
+                        if name in embedding_field:
+                            params[name] = embedding_field.pop(name)
+                    params['embedding_field'] = key
+                    kwargs = params
+
+
+
+
 
         if "neural" in kwargs:
             pass
         elif "embedding_field" in kwargs:
-            embedding_field = kwargs.pop("embedding_field")
-            self._params[embedding_field] = {
-                key: kwargs[key] for key in NeuralSearch._classes
+            self._params = {
+                key: kwargs[key] for key in NeuralSearch._classes if key in kwargs
             }
         else:
             keys = kwargs["neural"] = {}
@@ -286,6 +306,17 @@ class Neural(Query):
                 if name in kwargs:
                     keys[name] = kwargs.pop(name)
             super(Neural, self).__init__(**kwargs)
+
+    def to_dict(self) -> Any:
+        """
+        Serialize the DSL object to plain dict
+        """
+        d = {}
+        embedding_field = self._params.pop('embedding_field')
+        for pname, value in iteritems(self._params):
+            d[pname] = value
+        return {self.name: {embedding_field:d}}
+
 
 
 # compound queries

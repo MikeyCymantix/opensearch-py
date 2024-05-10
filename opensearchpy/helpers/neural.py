@@ -35,9 +35,7 @@ def SS(name: Any, **params: Any):
         if params:
             raise ValueError("SS() cannot accept parameters when passing in a dict.")
         kwargs = {}
-        print("PARAMS", params)
         ss = name.copy()  # type: ignore
-        print("NAME", ss)
         if "neural_query" in name:
             kwargs["neural_query"] = ss.pop("neural_query")
         # this means we get something of form {embedding field : {query text, etc}}
@@ -55,17 +53,12 @@ class NeuralSearch(DslBase):
     _type_name: str = "neural_query"
     _type_shortcut = staticmethod(SS)
     name: Optional[str] = None
-
-    def to_dict(self) -> Any:
-        d = super(NeuralSearch, self).to_dict()
-        for k in self._param_defs:
-            if k in d[self.name]:
-                d[k] = d[self.name].pop(k)
-        return d
+    _param_defs = {}
 
 
-#class EmbeddingField(NeuralSearch):
-    #name = "embedding_field"
+
+class EmbeddingField(NeuralSearch):
+    name = "embedding_field"
 
 
 class ModelId(NeuralSearch):
