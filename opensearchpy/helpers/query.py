@@ -269,49 +269,58 @@ class FunctionScore(Query):
         super(FunctionScore, self).__init__(**kwargs)
 
 
+from collections import abc as collections_abc
+
 class Neural(Query):
     name = "neural"
     _param_defs = {"neural": {"type": "neural_query"}}
 
     def __init__(self, **kwargs):
         super(Neural, self).__init__()
-        # if expand to dot is present then it's coming from
-        # and len == 2 then it might be coming from Q() so we flatten the
-        # embedding_field params
-        if not kwargs.get("__expand_to_dot", False) and len(kwargs) == 2:
 
-            params = {}
-            for key in kwargs.keys():
-                if isinstance(kwargs[key], collections_abc.Mapping):
-                    embedding_field = kwargs.get(key)
-                    for name in NeuralSearch._classes:
-                        if name in embedding_field:
-                            params[name] = embedding_field.pop(name)
-                    params["embedding_field"] = key
-                    kwargs = params
+        # Flatten embedding_field params if coming from Q() with only two kwargs
+        if not kwargs.get("__expand_to_dot", False) and len(kwargs) == 2:
+            embedding_field_params = {}
+            try:
+                for key, value in kwargs.items():
+                    if isinstance(value, collections_abc.Mapping):
+                        embedding_field = value
+                        for name in NeuralSearch._classes:
+                            if name in embedding_field:
+                                embedding_field_params[name] = embedding_field.pop(name)
+                        embedding_field_params["embedding_field"] = key
+                kwargs = embedding_field_params
+            except KeyError as e:
+                raise ValueError(f"Missing key during embedding field flattening: {e}")
 
         if "neural" in kwargs:
-            pass
+            self._params = kwargs
         elif "embedding_field" in kwargs:
             self._params = {
                 key: kwargs[key] for key in NeuralSearch._classes if key in kwargs
             }
         else:
-            keys = kwargs["neural"] = {}
-            for name in NeuralSearch._classes:  # ingnore
+            neural_params = {}
+            for name in NeuralSearch._classes:
                 if name in kwargs:
-                    keys[name] = kwargs.pop(name)
+                    neural_params[name] = kwargs.pop(name)
+            kwargs["neural"] = neural_params
             super(Neural, self).__init__(**kwargs)
 
-    def to_dict(self) -> Any:
+        # Validate required parameters
+        if not self._params:
+            raise ValueError("No valid parameters provided.")
+        if "embedding_field" not in self._params:
+            raise ValueError("Missing 'embedding_field' parameter.")
+
+    def to_dict(self) -> dict:
         """
-        Serialize the DSL object to plain dict
+        Serialize the DSL object to a plain dictionary
         """
-        d = {}
-        embedding_field = self._params.pop("embedding_field")
-        for pname, value in iteritems(self._params):
-            d[pname] = value
-        return {self.name: {embedding_field: d}}
+        if "embedding_field" not in self._params:
+            raise ValueError("Missing 'embedding_field' in the parameters.")
+        d = {pname: value for pname, value in self._params.items() if pname != "embedding_field"}
+        return {self.name: {self._params["embedding_field"]: d}}
 
 
 # compound queries
